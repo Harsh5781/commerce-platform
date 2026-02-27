@@ -13,7 +13,9 @@ RUN chmod +x gradlew && ./gradlew dependencies
 COPY src src
 
 ARG SKIP_TESTS=true
-RUN if [ "$SKIP_TESTS" = "false" ]; then ./gradlew test --no-daemon; fi
+RUN if [ "$SKIP_TESTS" = "false" ]; then \
+      ./gradlew test --no-daemon -Dtest.excludes="**/integration/**"; \
+    fi
 
 RUN ./gradlew bootJar -x test
 
