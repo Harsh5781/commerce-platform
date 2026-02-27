@@ -1,0 +1,24 @@
+# Environment
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Node
+node_modules/
+dist/
+
+# Docker
+docker-compose.override.yml
+
+# Logs
+*.log
+
+# Test results
+load-tests/results/
