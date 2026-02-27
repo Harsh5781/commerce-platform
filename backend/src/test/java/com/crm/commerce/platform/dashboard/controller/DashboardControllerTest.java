@@ -11,6 +11,7 @@ import com.crm.commerce.platform.dashboard.dto.DashboardStats;
 import com.crm.commerce.platform.dashboard.service.DashboardService;
 import com.crm.commerce.platform.user.enums.Role;
 import com.crm.commerce.platform.user.model.User;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
@@ -44,6 +45,7 @@ class DashboardControllerTest {
     @MockBean private DashboardService dashboardService;
     @MockBean private JwtTokenProvider jwtTokenProvider;
     @MockBean private CustomUserDetailsService customUserDetailsService;
+    @MockBean private MeterRegistry meterRegistry;
 
     @Test
     void getStats_returnsStatistics() throws Exception {

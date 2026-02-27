@@ -11,7 +11,9 @@ import com.crm.commerce.platform.order.dto.OrderResponse;
 import com.crm.commerce.platform.order.dto.UpdateOrderStatusRequest;
 import com.crm.commerce.platform.order.model.*;
 import com.crm.commerce.platform.order.repository.OrderRepository;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -31,7 +33,6 @@ import java.util.List;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class OrderService {
 
     private final OrderRepository orderRepository;
@@ -39,49 +40,73 @@ public class OrderService {
     private final DashboardService dashboardService;
     private final SequenceGenerator sequenceGenerator;
     private final AuditService auditService;
+    private final Counter orderCreatedCounter;
+    private final Counter orderStatusUpdatedCounter;
+    private final Timer orderCreateTimer;
+    private final Timer orderQueryTimer;
+
+    public OrderService(OrderRepository orderRepository, MongoTemplate mongoTemplate,
+                        DashboardService dashboardService, SequenceGenerator sequenceGenerator,
+                        AuditService auditService, MeterRegistry meterRegistry) {
+        this.orderRepository = orderRepository;
+        this.mongoTemplate = mongoTemplate;
+        this.dashboardService = dashboardService;
+        this.sequenceGenerator = sequenceGenerator;
+        this.auditService = auditService;
+        this.orderCreatedCounter = Counter.builder("orders.created.total")
+                .description("Total orders created").register(meterRegistry);
+        this.orderStatusUpdatedCounter = Counter.builder("orders.status.updated.total")
+                .description("Total order status updates").register(meterRegistry);
+        this.orderCreateTimer = Timer.builder("orders.create.duration")
+                .description("Time to create an order").register(meterRegistry);
+        this.orderQueryTimer = Timer.builder("orders.query.duration")
+                .description("Time to query orders").register(meterRegistry);
+    }
 
     public Page<OrderResponse> getOrders(String channel, String status, String search,
                                          LocalDateTime startDate, LocalDateTime endDate,
                                          Pageable pageable) {
-        Query query = new Query();
-        List<Criteria> criteriaList = new ArrayList<>();
+        return orderQueryTimer.record(() -> {
+            Query query = new Query();
+            List<Criteria> criteriaList = new ArrayList<>();
 
-        if (StringUtils.hasText(channel)) {
-            criteriaList.add(Criteria.where("channel").is(channel.toUpperCase()));
-        }
-        if (StringUtils.hasText(status)) {
-            try {
-                OrderStatus.valueOf(status.toUpperCase());
-                criteriaList.add(Criteria.where("status").is(status.toUpperCase()));
-            } catch (IllegalArgumentException e) {
-                throw new BadRequestException("Invalid order status: " + status);
+            if (StringUtils.hasText(channel)) {
+                criteriaList.add(Criteria.where("channel").is(channel.toUpperCase()));
             }
-        }
-        if (StringUtils.hasText(search)) {
-            criteriaList.add(new Criteria().orOperator(
-                    Criteria.where("orderNumber").regex(search, "i"),
-                    Criteria.where("customer.name").regex(search, "i"),
-                    Criteria.where("customer.email").regex(search, "i"),
-                    Criteria.where("channelOrderRef").regex(search, "i")
-            ));
-        }
-        if (startDate != null) {
-            criteriaList.add(Criteria.where("placedAt").gte(startDate));
-        }
-        if (endDate != null) {
-            criteriaList.add(Criteria.where("placedAt").lte(endDate));
-        }
+            if (StringUtils.hasText(status)) {
+                try {
+                    OrderStatus.valueOf(status.toUpperCase());
+                    criteriaList.add(Criteria.where("status").is(status.toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    throw new BadRequestException("Invalid order status: " + status);
+                }
+            }
+            if (StringUtils.hasText(search)) {
+                criteriaList.add(new Criteria().orOperator(
+                        Criteria.where("orderNumber").regex(search, "i"),
+                        Criteria.where("customer.name").regex(search, "i"),
+                        Criteria.where("customer.email").regex(search, "i"),
+                        Criteria.where("channelOrderRef").regex(search, "i")
+                ));
+            }
+            if (startDate != null) {
+                criteriaList.add(Criteria.where("placedAt").gte(startDate));
+            }
+            if (endDate != null) {
+                criteriaList.add(Criteria.where("placedAt").lte(endDate));
+            }
 
-        if (!criteriaList.isEmpty()) {
-            query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
-        }
+            if (!criteriaList.isEmpty()) {
+                query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
+            }
 
-        long total = mongoTemplate.count(query, Order.class);
-        query.with(pageable);
-        List<Order> orders = mongoTemplate.find(query, Order.class);
+            long total = mongoTemplate.count(query, Order.class);
+            query.with(pageable);
+            List<Order> orders = mongoTemplate.find(query, Order.class);
 
-        Page<Order> page = new PageImpl<>(orders, pageable, total);
-        return page.map(OrderResponse::from);
+            Page<Order> page = new PageImpl<>(orders, pageable, total);
+            return page.map(OrderResponse::from);
+        });
     }
 
     @Cacheable(value = "orders", key = "#id")
@@ -99,6 +124,10 @@ public class OrderService {
 
     @CacheEvict(value = "orders", allEntries = true)
     public OrderResponse createOrder(CreateOrderRequest request, String createdBy) {
+        return orderCreateTimer.record(() -> doCreateOrder(request, createdBy));
+    }
+
+    private OrderResponse doCreateOrder(CreateOrderRequest request, String createdBy) {
         validateCreateRequest(request);
 
         List<OrderItem> items = request.getItems().stream()
@@ -149,6 +178,7 @@ public class OrderService {
                 .build();
 
         order = orderRepository.save(order);
+        orderCreatedCounter.increment();
         dashboardService.clearCache();
         auditService.logAction(null, createdBy, "CREATE_ORDER", "Order", order.getId(),
                 java.util.Map.of("orderNumber", order.getOrderNumber(), "channel", channel));
@@ -183,6 +213,7 @@ public class OrderService {
                 .timestamp(LocalDateTime.now())
                 .build());
         order = orderRepository.save(order);
+        orderStatusUpdatedCounter.increment();
         dashboardService.clearCache();
         auditService.logAction(null, changedBy, "UPDATE_ORDER_STATUS", "Order", order.getId(),
                 java.util.Map.of("orderNumber", order.getOrderNumber(),

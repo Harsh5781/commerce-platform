@@ -9,10 +9,10 @@ import com.crm.commerce.platform.config.AppProperties;
 import com.crm.commerce.platform.user.enums.Role;
 import com.crm.commerce.platform.user.model.User;
 import com.crm.commerce.platform.user.repository.UserRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -35,13 +35,14 @@ class AuthServiceTest {
     @Mock private PasswordEncoder passwordEncoder;
     @Mock private AppProperties appProperties;
 
-    @InjectMocks
     private AuthService authService;
 
     private AppProperties.Jwt jwtConfig;
 
     @BeforeEach
     void setUp() {
+        authService = new AuthService(authenticationManager, jwtTokenProvider, userRepository,
+                passwordEncoder, appProperties, new SimpleMeterRegistry());
         jwtConfig = new AppProperties.Jwt();
         jwtConfig.setExpirationMs(3600000);
     }

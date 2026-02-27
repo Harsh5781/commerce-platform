@@ -11,11 +11,12 @@ import com.crm.commerce.platform.order.dto.OrderResponse;
 import com.crm.commerce.platform.order.dto.UpdateOrderStatusRequest;
 import com.crm.commerce.platform.order.model.*;
 import com.crm.commerce.platform.order.repository.OrderRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.mongodb.core.MongoTemplate;
@@ -40,8 +41,13 @@ class OrderServiceTest {
     @Mock private SequenceGenerator sequenceGenerator;
     @Mock private AuditService auditService;
 
-    @InjectMocks
     private OrderService orderService;
+
+    @BeforeEach
+    void setUp() {
+        orderService = new OrderService(orderRepository, mongoTemplate, dashboardService,
+                sequenceGenerator, auditService, new SimpleMeterRegistry());
+    }
 
     @Test
     void getOrderById_existingOrder_returnsResponse() {

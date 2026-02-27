@@ -9,7 +9,8 @@ import com.crm.commerce.platform.config.AppProperties;
 import com.crm.commerce.platform.user.enums.Role;
 import com.crm.commerce.platform.user.model.User;
 import com.crm.commerce.platform.user.repository.UserRepository;
-import lombok.RequiredArgsConstructor;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -20,7 +21,6 @@ import org.springframework.util.StringUtils;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class AuthService {
 
     private final AuthenticationManager authenticationManager;
@@ -28,6 +28,22 @@ public class AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final AppProperties appProperties;
+    private final Counter loginSuccessCounter;
+    private final Counter loginFailureCounter;
+
+    public AuthService(AuthenticationManager authenticationManager, JwtTokenProvider jwtTokenProvider,
+                       UserRepository userRepository, PasswordEncoder passwordEncoder,
+                       AppProperties appProperties, MeterRegistry meterRegistry) {
+        this.authenticationManager = authenticationManager;
+        this.jwtTokenProvider = jwtTokenProvider;
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.appProperties = appProperties;
+        this.loginSuccessCounter = Counter.builder("auth.login.success.total")
+                .description("Successful login attempts").register(meterRegistry);
+        this.loginFailureCounter = Counter.builder("auth.login.failure.total")
+                .description("Failed login attempts").register(meterRegistry);
+    }
 
     public LoginResponse login(LoginRequest request) {
         ValidationUtils.validate()
@@ -35,14 +51,21 @@ public class AuthService {
                 .requireNonBlank(request.getPassword(), "password")
                 .execute();
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        Authentication authentication;
+        try {
+            authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword()));
+        } catch (Exception e) {
+            loginFailureCounter.increment();
+            throw e;
+        }
 
         CustomUserDetails userDetails = (CustomUserDetails) authentication.getPrincipal();
 
         String accessToken = jwtTokenProvider.generateAccessToken(userDetails);
         String refreshToken = jwtTokenProvider.generateRefreshToken(userDetails);
 
+        loginSuccessCounter.increment();
         log.info("User logged in: {}", userDetails.getEmail());
 
         return LoginResponse.builder()

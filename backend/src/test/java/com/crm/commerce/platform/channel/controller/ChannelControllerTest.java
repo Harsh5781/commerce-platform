@@ -12,6 +12,7 @@ import com.crm.commerce.platform.config.SecurityConfig;
 import com.crm.commerce.platform.order.model.Order;
 import com.crm.commerce.platform.user.enums.Role;
 import com.crm.commerce.platform.user.model.User;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -47,6 +48,7 @@ class ChannelControllerTest {
     @MockBean private ChannelService channelService;
     @MockBean private JwtTokenProvider jwtTokenProvider;
     @MockBean private CustomUserDetailsService customUserDetailsService;
+    @MockBean private MeterRegistry meterRegistry;
 
     private CustomUserDetails adminUser;
     private CustomUserDetails viewerUser;

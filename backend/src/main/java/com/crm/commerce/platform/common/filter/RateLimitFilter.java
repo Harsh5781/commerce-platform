@@ -3,6 +3,8 @@ package com.crm.commerce.platform.common.filter;
 import com.crm.commerce.platform.config.AppProperties;
 import io.github.bucket4j.Bandwidth;
 import io.github.bucket4j.Bucket;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,9 +25,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
     private final AppProperties appProperties;
+    private final Counter rateLimitRejectedCounter;
 
-    public RateLimitFilter(AppProperties appProperties) {
+    public RateLimitFilter(AppProperties appProperties, MeterRegistry meterRegistry) {
         this.appProperties = appProperties;
+        this.rateLimitRejectedCounter = Counter.builder("ratelimit.rejected.total")
+                .description("Total requests rejected by rate limiter").register(meterRegistry);
     }
 
     @Override
@@ -37,6 +42,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (bucket.tryConsume(1)) {
             filterChain.doFilter(request, response);
         } else {
+            rateLimitRejectedCounter.increment();
             log.warn("Rate limit exceeded for IP: {}", clientIp);
             response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
             response.setContentType("application/json");

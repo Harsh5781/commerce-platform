@@ -13,6 +13,7 @@ import com.crm.commerce.platform.dashboard.service.DashboardService;
 import com.crm.commerce.platform.order.model.Customer;
 import com.crm.commerce.platform.order.model.Order;
 import com.crm.commerce.platform.order.repository.OrderRepository;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,7 +50,8 @@ class ChannelServiceTest {
         channelService = new ChannelService(
                 channelRepository, orderRepository, dashboardService,
                 sequenceGenerator, auditService,
-                List.of(websiteConnector, amazonConnector));
+                List.of(websiteConnector, amazonConnector),
+                new SimpleMeterRegistry());
     }
 
     @Test

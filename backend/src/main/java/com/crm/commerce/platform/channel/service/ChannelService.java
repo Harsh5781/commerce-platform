@@ -13,6 +13,9 @@ import com.crm.commerce.platform.order.model.Order;
 import com.crm.commerce.platform.order.model.OrderStatus;
 import com.crm.commerce.platform.order.model.OrderTimeline;
 import com.crm.commerce.platform.order.repository.OrderRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.Gauge;
+import io.micrometer.core.instrument.MeterRegistry;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
@@ -21,6 +24,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -34,13 +38,17 @@ public class ChannelService {
     private final SequenceGenerator sequenceGenerator;
     private final AuditService auditService;
     private final Map<String, ChannelConnector> connectors;
+    private final Counter channelSyncCounter;
+    private final Counter channelSyncOrdersCounter;
+    private final AtomicInteger availableChannels = new AtomicInteger(0);
 
     public ChannelService(ChannelRepository channelRepository,
                           OrderRepository orderRepository,
                           DashboardService dashboardService,
                           SequenceGenerator sequenceGenerator,
                           AuditService auditService,
-                          List<ChannelConnector> connectorList) {
+                          List<ChannelConnector> connectorList,
+                          MeterRegistry meterRegistry) {
         this.channelRepository = channelRepository;
         this.orderRepository = orderRepository;
         this.dashboardService = dashboardService;
@@ -48,11 +56,17 @@ public class ChannelService {
         this.auditService = auditService;
         this.connectors = connectorList.stream()
                 .collect(Collectors.toMap(ChannelConnector::getChannelCode, Function.identity()));
+        this.channelSyncCounter = Counter.builder("channels.sync.total")
+                .description("Total channel sync operations").register(meterRegistry);
+        this.channelSyncOrdersCounter = Counter.builder("channels.sync.orders.total")
+                .description("Total orders synced from channels").register(meterRegistry);
+        Gauge.builder("channels.available", availableChannels, AtomicInteger::get)
+                .description("Number of available channels").register(meterRegistry);
     }
 
     public List<ChannelResponse> getAllChannels() {
         List<Channel> channels = channelRepository.findAll();
-        return channels.stream()
+        List<ChannelResponse> responses = channels.stream()
                 .map(ch -> {
                     ChannelConnector connector = connectors.get(ch.getCode().name());
                     boolean available = connector != null && connector.isAvailable();
@@ -60,6 +74,8 @@ public class ChannelService {
                     return ChannelResponse.from(ch, available, count);
                 })
                 .toList();
+        availableChannels.set((int) responses.stream().filter(ChannelResponse::isAvailable).count());
+        return responses;
     }
 
     public ChannelResponse getChannelByCode(String code) {
@@ -112,6 +128,8 @@ public class ChannelService {
             saved.add(orderRepository.save(order));
         }
 
+        channelSyncCounter.increment();
+        channelSyncOrdersCounter.increment(saved.size());
         dashboardService.clearCache();
         auditService.logAction(null, "channel-sync", "CHANNEL_SYNC", "Channel", code,
                 java.util.Map.of("channel", code, "ordersSynced", saved.size()));
