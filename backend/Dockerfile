@@ -11,6 +11,10 @@ COPY gradle gradle
 COPY gradlew build.gradle settings.gradle gradle.properties ./
 RUN chmod +x gradlew && ./gradlew dependencies
 COPY src src
+
+ARG SKIP_TESTS=true
+RUN if [ "$SKIP_TESTS" = "false" ]; then ./gradlew test --no-daemon; fi
+
 RUN ./gradlew bootJar -x test
 
 # Stage 2: Run
