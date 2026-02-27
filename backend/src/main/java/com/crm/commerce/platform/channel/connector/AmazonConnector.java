@@ -40,7 +40,7 @@ public class AmazonConnector implements ChannelConnector {
     @Override
     @CircuitBreaker(name = "amazonChannel", fallbackMethod = "isAvailableFallback")
     public boolean isAvailable() {
-        simulateApiLatency();
+        simulatePingLatency();
         return true;
     }
 
@@ -59,6 +59,14 @@ public class AmazonConnector implements ChannelConnector {
     private void simulateApiLatency() {
         try {
             Thread.sleep(ThreadLocalRandom.current().nextInt(100, 500));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void simulatePingLatency() {
+        try {
+            Thread.sleep(ThreadLocalRandom.current().nextInt(10, 50));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

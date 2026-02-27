@@ -34,7 +34,7 @@ public class WebsiteConnector implements ChannelConnector {
     @Override
     @CircuitBreaker(name = "websiteChannel", fallbackMethod = "isAvailableFallback")
     public boolean isAvailable() {
-        simulateApiLatency();
+        simulatePingLatency();
         return true;
     }
 
@@ -52,6 +52,14 @@ public class WebsiteConnector implements ChannelConnector {
     private void simulateApiLatency() {
         try {
             Thread.sleep(ThreadLocalRandom.current().nextInt(50, 200));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void simulatePingLatency() {
+        try {
+            Thread.sleep(ThreadLocalRandom.current().nextInt(5, 30));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }

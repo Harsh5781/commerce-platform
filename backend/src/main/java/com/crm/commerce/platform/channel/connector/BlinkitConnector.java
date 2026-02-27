@@ -40,7 +40,7 @@ public class BlinkitConnector implements ChannelConnector {
     @Override
     @CircuitBreaker(name = "blinkitChannel", fallbackMethod = "isAvailableFallback")
     public boolean isAvailable() {
-        simulateApiLatency();
+        simulatePingLatency();
         return true;
     }
 
@@ -59,6 +59,14 @@ public class BlinkitConnector implements ChannelConnector {
     private void simulateApiLatency() {
         try {
             Thread.sleep(ThreadLocalRandom.current().nextInt(50, 300));
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+    }
+
+    private void simulatePingLatency() {
+        try {
+            Thread.sleep(ThreadLocalRandom.current().nextInt(5, 40));
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
