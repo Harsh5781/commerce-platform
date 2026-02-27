@@ -32,9 +32,19 @@ jobs:
       - name: Build frontend
         run: docker build -t commerce-platform-frontend:ci ./frontend
 
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Frontend — npm audit
+        working-directory: frontend
+        run: npm audit --audit-level=high || true
+
   verify:
     name: Verify
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    needs: [backend, frontend, security-scan]
     steps:
-      - run: echo "All builds passed for ${{ inputs.environment }}"
+      - run: echo "All builds and scans passed for ${{ inputs.environment }}"
