@@ -6,7 +6,7 @@ import com.crm.commerce.platform.auth.security.CustomUserDetails;
 import com.crm.commerce.platform.common.exception.DuplicateResourceException;
 import com.crm.commerce.platform.common.util.ValidationUtils;
 import com.crm.commerce.platform.config.AppProperties;
-import com.crm.commerce.platform.user.model.Role;
+import com.crm.commerce.platform.user.enums.Role;
 import com.crm.commerce.platform.user.model.User;
 import com.crm.commerce.platform.user.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

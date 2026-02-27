@@ -1,5 +1,6 @@
 package com.crm.commerce.platform.user.model;
 
+import com.crm.commerce.platform.user.enums.Role;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
