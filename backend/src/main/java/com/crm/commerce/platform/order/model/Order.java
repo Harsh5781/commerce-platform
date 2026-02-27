@@ -7,10 +7,6 @@ import lombok.NoArgsConstructor;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.mongodb.core.index.CompoundIndex;
-import org.springframework.data.mongodb.core.index.CompoundIndexes;
-import org.springframework.data.mongodb.core.index.Indexed;
-import org.springframework.data.mongodb.core.index.TextIndexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.math.BigDecimal;
@@ -24,18 +20,13 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "orders")
-@CompoundIndexes({
-    @CompoundIndex(name = "channel_status_date", def = "{'channel': 1, 'status': 1, 'placedAt': -1}")
-})
 public class Order {
 
     @Id
     private String id;
 
-    @Indexed(unique = true)
     private String orderNumber;
 
-    @Indexed
     private String channel;
 
     private String channelOrderRef;
@@ -45,7 +36,6 @@ public class Order {
     @Builder.Default
     private List<OrderItem> items = new ArrayList<>();
 
-    @Indexed
     private OrderStatus status;
 
     private BigDecimal totalAmount;
@@ -57,7 +47,6 @@ public class Order {
     @Builder.Default
     private List<OrderTimeline> timeline = new ArrayList<>();
 
-    @Indexed(direction = org.springframework.data.mongodb.core.index.IndexDirection.DESCENDING)
     private LocalDateTime placedAt;
 
     @CreatedDate

@@ -1,11 +1,17 @@
 # Stage 1: Build
 FROM eclipse-temurin:21-jdk-alpine AS builder
 WORKDIR /app
+
+ENV GRADLE_OPTS="-Dorg.gradle.daemon=false \
+    -Dorg.gradle.vfs.watch=false \
+    -Dorg.gradle.native=false \
+    -Dorg.gradle.workers.max=2"
+
 COPY gradle gradle
 COPY gradlew build.gradle settings.gradle gradle.properties ./
-RUN chmod +x gradlew && ./gradlew dependencies --no-daemon
+RUN chmod +x gradlew && ./gradlew dependencies
 COPY src src
-RUN ./gradlew bootJar --no-daemon -x test
+RUN ./gradlew bootJar -x test
 
 # Stage 2: Run
 FROM eclipse-temurin:21-jre-alpine
